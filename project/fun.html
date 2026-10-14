@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#0b3978">
+	<title>Fun | JOHNNEX WEB</title>
+	<link rel="stylesheet" href="site.css">
+</head>
+<body>
+	<div class="page-shell">
+		<header class="page-header">
+			<a class="brand-link" href="index.html">JOHNNEX WEB</a>
+			<a class="home-link" href="index.html">Back to homepage</a>
+		</header>
+		<main class="fun-page">
+			<div class="fun-title-row">
+				<div>
+					<h1>Fun</h1>
+					<p>Shuffle up and play a round of Whot.</p>
+				</div>
+			</div>
+			<div class="fun-layout">
+				<section class="game-panel" aria-label="Whot game">
+					<div class="game-toolbar">
+						<span class="game-label">Whot · You vs computer</span>
+						<span class="game-label" id="round-label">Ready</span>
+					</div>
+					<div id="setup-screen" class="setup-screen">
+						<h2>Your turn to deal</h2>
+						<p>Match a shape or number. Play your cards first to win the round.</p>
+						<label class="name-field" for="player-name">
+							<span>Player name</span>
+							<input id="player-name" name="player-name" maxlength="20" autocomplete="nickname" placeholder="Enter a name for the leaderboard">
+						</label>
+						<button class="fun-button" id="start-game" type="button">Start a game</button>
+					</div>
+					<div id="active-game" class="game-hidden">
+						<p class="game-status" id="game-status" aria-live="polite">Your turn.</p>
+						<div class="game-table">
+							<div class="player-line"><strong>Computer</strong><span id="computer-count">0 cards</span></div>
+							<div class="table-cards">
+								<div class="pile-control">
+									<button id="draw-pile" type="button" aria-label="Draw a card">WHOT</button>
+									<span id="deck-count">Deck</span>
+								</div>
+								<div id="top-card" class="whot-card" aria-label="Top discard card">?</div>
+							</div>
+							<div class="player-line"><strong id="player-label">You</strong><span id="player-count">0 cards</span></div>
+						</div>
+						<div class="hand-section">
+							<h2 class="hand-heading">Your hand</h2>
+							<div class="player-hand" id="player-hand" aria-label="Your cards"></div>
+							<div class="suit-picker game-hidden" id="suit-picker" aria-label="Choose a shape"></div>
+						</div>
+						<button class="fun-button game-hidden" id="new-game" type="button">Play another round</button>
+					</div>
+					<p class="game-footnote">Match the number or shape. A 1 or 8 skips your opponent, 2 and 5 make them draw, 14 sends one to the market, and WHOT lets you choose the next shape.</p>
+				</section>
+			<aside class="leaderboard-panel" aria-labelledby="leaderboard-title">
+				<h2 id="leaderboard-title">Leaderboard</h2>
+				<p class="leaderboard-note">Players on this browser, ranked by wins.</p>
+				<table class="leaderboard-table">
+					<thead><tr><th>Rank</th><th>Player</th><th>Wins</th><th>Played</th></tr></thead>
+					<tbody id="leaderboard-body"></tbody>
+				</table>
+			</aside>
+			</div>
+		</main>
+		<footer>© JOHNNEX WEB</footer>
+	</div>
+	<script>
+		const suits = [
+			{ name: "Circle", symbol: "●" },
+			{ name: "Triangle", symbol: "▲" },
+			{ name: "Cross", symbol: "✚" },
+			{ name: "Square", symbol: "■" },
+			{ name: "Star", symbol: "★" }
+		];
+		const ranks = [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14];
+		const leaderboardKey = "joh nnex-whot-leaderboard";
+		const elements = {
+			setup: document.querySelector("#setup-screen"),
+			active: document.querySelector("#active-game"),
+			name: document.querySelector("#player-name"),
+			start: document.querySelector("#start-game"),
+			status: document.querySelector("#game-status"),
+			round: document.querySelector("#round-label"),
+			computerCount: document.querySelector("#computer-count"),
+			playerCount: document.querySelector("#player-count"),
+			playerLabel: document.querySelector("#player-label"),
+			deckCount: document.querySelector("#deck-count"),
+			draw: document.querySelector("#draw-pile"),
+			top: document.querySelector("#top-card"),
+			hand: document.querySelector("#player-hand"),
+			suitPicker: document.querySelector("#suit-picker"),
+			newGame: document.querySelector("#new-game"),
+			leaderboard: document.querySelector("#leaderboard-body")
+		};
+		let game = null;
+		let leaderboard = readLeaderboard();
+
+		function readLeaderboard() {
+			try {
+				return JSON.parse(localStorage.getItem(leaderboardKey) || "{}");
+			} catch {
+				return {};
+			}
+		}
+
+		function saveLeaderboard() {
+			localStorage.setItem(leaderboardKey, JSON.stringify(leaderboard));
+			renderLeaderboard();
+		}
+
+		function renderLeaderboard() {
+			const entries = Object.values(leaderboard).sort((first, second) =>
+				second.wins - first.wins || second.played - first.played || first.name.localeCompare(second.name)
+			).slice(0, 10);
+			elements.leaderboard.replaceChildren();
+			if (!entries.length) {
+				const row = document.createElement("tr");
+				const cell = document.createElement("td");
+				cell.colSpan = 4;
+				cell.className = "leaderboard-empty";
+				cell.textContent = "No players yet. Deal the first hand.";
+				row.append(cell);
+				elements.leaderboard.append(row);
+				return;
+			}
+			entries.forEach((entry, index) => {
+				const row = document.createElement("tr");
+				[index + 1, entry.name, entry.wins, entry.played].forEach(value => {
+					const cell = document.createElement("td");
+					cell.textContent = value;
+					row.append(cell);
+				});
+				elements.leaderboard.append(row);
+			});
+		}
+
+		function shuffle(cards) {
+			for (let index = cards.length - 1; index > 0; index--) {
+				const swapIndex = Math.floor(Math.random() * (index + 1));
+				[cards[index], cards[swapIndex]] = [cards[swapIndex], cards[index]];
+			}
+			return cards;
+		}
+
+		function createDeck() {
+			const cards = [];
+			suits.forEach((suit, suitIndex) => ranks.forEach(rank => cards.push({ rank, suit: suitIndex })));
+			for (let count = 0; count < 5; count++) cards.push({ rank: 20, suit: -1 });
+			return shuffle(cards);
+		}
+
+		function startGame() {
+			const name = elements.name.value.trim().slice(0, 20) || "Guest";
+			const playerKey = name.toLocaleLowerCase();
+			const deck = createDeck();
+			const playerHand = deck.splice(0, 6);
+			const computerHand = deck.splice(0, 6);
+			const starterIndex = deck.findIndex(card => card.rank !== 20);
+			const firstCard = deck.splice(starterIndex, 1)[0];
+			game = { name, playerKey, deck, playerHand, computerHand, discard: [firstCard], activeSuit: firstCard.suit, turn: "player", pendingWildIndex: null, finished: false };
+			leaderboard[playerKey] = leaderboard[playerKey] || { name, wins: 0, played: 0 };
+			leaderboard[playerKey].name = name;
+			leaderboard[playerKey].played++;
+			saveLeaderboard();
+			elements.setup.classList.add("game-hidden");
+			elements.active.classList.remove("game-hidden");
+			elements.newGame.classList.add("game-hidden");
+			elements.round.textContent = "Round in play";
+			elements.status.textContent = "Your turn. Play a matching card or draw.";
+			renderGame();
+		}
+
+		function canPlay(card) {
+			const topCard = game.discard[game.discard.length - 1];
+			return card.rank === 20 || card.rank === topCard.rank || card.suit === game.activeSuit;
+		}
+
+		function drawOne() {
+			if (!game.deck.length && game.discard.length > 1) {
+				const topCard = game.discard.pop();
+				game.deck = shuffle(game.discard.splice(0));
+				game.discard = [topCard];
+			}
+			return game.deck.pop() || null;
+		}
+
+		function drawFor(hand, amount) {
+			for (let count = 0; count < amount; count++) {
+				const card = drawOne();
+				if (!card) break;
+				hand.push(card);
+			}
+		}
+
+		function cardName(card) {
+			return card.rank === 20 ? "WHOT" : `${card.rank} ${suits[card.suit].name}`;
+		}
+
+		function renderCard(card, className) {
+			const node = document.createElement("span");
+			node.className = `whot-card${card.rank === 20 ? " is-wild" : ""}`;
+			node.textContent = card.rank === 20 ? "W" : suits[card.suit].symbol;
+			node.dataset.corner = card.rank === 20 ? "W" : card.rank;
+			node.setAttribute("aria-label", cardName(card));
+			if (className) node.classList.add(className);
+			return node;
+		}
+
+		function renderGame() {
+			if (!game) return;
+			elements.playerLabel.textContent = game.name;
+			elements.playerCount.textContent = `${game.playerHand.length} card${game.playerHand.length === 1 ? "" : "s"}`;
+			elements.computerCount.textContent = `${game.computerHand.length} cards`;
+			elements.deckCount.textContent = `${game.deck.length} in deck`;
+			elements.top.replaceChildren(renderCard(game.discard[game.discard.length - 1]));
+			elements.top.setAttribute("aria-label", `Top card: ${cardName(game.discard[game.discard.length - 1])}; next shape ${suits[game.activeSuit].name}`);
+			elements.hand.replaceChildren();
+			const hasPlayable = game.playerHand.some(canPlay);
+			game.playerHand.forEach((card, index) => {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.className = `hand-card${card.rank === 20 ? " is-wild" : ""}`;
+				button.textContent = card.rank === 20 ? "W" : suits[card.suit].symbol;
+				button.dataset.corner = card.rank === 20 ? "W" : card.rank;
+				button.setAttribute("aria-label", `Play ${cardName(card)}`);
+				button.disabled = game.turn !== "player" || game.finished || !canPlay(card) || game.pendingWildIndex !== null;
+				button.addEventListener("click", () => selectCard(index));
+				elements.hand.append(button);
+			});
+			elements.draw.disabled = game.turn !== "player" || game.finished || hasPlayable || game.pendingWildIndex !== null;
+			elements.suitPicker.classList.toggle("game-hidden", game.pendingWildIndex === null);
+			elements.newGame.classList.toggle("game-hidden", !game.finished);
+		}
+
+		function selectCard(index) {
+			if (!game || game.turn !== "player" || game.finished) return;
+			const card = game.playerHand[index];
+			if (!canPlay(card)) return;
+			if (card.rank === 20) {
+				game.pendingWildIndex = index;
+				elements.suitPicker.replaceChildren();
+				suits.forEach((suit, suitIndex) => {
+					const button = document.createElement("button");
+					button.type = "button";
+					button.className = "suit-choice";
+					button.textContent = suit.symbol;
+					button.setAttribute("aria-label", `Choose ${suit.name}`);
+					button.addEventListener("click", () => playCard("player", index, suitIndex));
+					elements.suitPicker.append(button);
+				});
+				gameMessage("Choose the next shape.");
+				renderGame();
+				return;
+			}
+			playCard("player", index, card.suit);
+		}
+
+		function playCard(actor, index, chosenSuit) {
+			if (game.finished) return;
+			const hand = actor === "player" ? game.playerHand : game.computerHand;
+			const [card] = hand.splice(index, 1);
+			game.discard.push(card);
+			game.activeSuit = card.rank === 20 ? chosenSuit : card.suit;
+			game.pendingWildIndex = null;
+			if (!hand.length) {
+				finishGame(actor);
+				return;
+			}
+			const opponent = actor === "player" ? "computer" : "player";
+			const opponentHand = opponent === "player" ? game.playerHand : game.computerHand;
+			if (card.rank === 2 || card.rank === 5) {
+				const amount = card.rank === 2 ? 2 : 3;
+				drawFor(opponentHand, amount);
+				game.turn = actor;
+				gameMessage(`${card.rank} played. ${opponent === "player" ? "You" : "Computer"} draw${opponent === "player" ? "" : "s"} ${amount}; play again.`);
+			} else if (card.rank === 1 || card.rank === 8) {
+				game.turn = actor;
+				gameMessage(`${card.rank} played. Your opponent is skipped.`);
+			} else if (card.rank === 14) {
+				drawFor(opponentHand, 1);
+				game.turn = actor;
+				gameMessage(`14 played. ${opponent === "player" ? "You" : "Computer"} draw${opponent === "player" ? "" : "s"} one from the market; play again.`);
+			} else {
+				game.turn = opponent;
+				gameMessage(actor === "player" ? "Nice play. The computer is up." : "Computer played. Your turn.");
+			}
+			renderGame();
+			if (game.turn === "computer") window.setTimeout(playComputerTurn, 650);
+		}
+
+		function gameMessage(message) {
+			elements.status.textContent = message;
+		}
+
+		function playComputerTurn() {
+			if (!game || game.finished || game.turn !== "computer") return;
+			let index = game.computerHand.findIndex(canPlay);
+			if (index < 0) {
+				const drawnCard = drawOne();
+				if (!drawnCard) {
+					finishGame("player");
+					return;
+				}
+				game.computerHand.push(drawnCard);
+				index = canPlay(drawnCard) ? game.computerHand.length - 1 : -1;
+			}
+			if (index < 0) {
+				game.turn = "player";
+				gameMessage("Computer drew a card. Your turn.");
+				renderGame();
+				return;
+			}
+			const card = game.computerHand[index];
+			let chosenSuit = card.suit;
+			if (card.rank === 20) {
+				const counts = suits.map((_, suitIndex) => game.computerHand.reduce((total, heldCard, heldIndex) =>
+					total + (heldIndex !== index && heldCard.suit === suitIndex ? 1 : 0), 0));
+				chosenSuit = counts.indexOf(Math.max(...counts));
+			}
+			playCard("computer", index, chosenSuit);
+		}
+
+		function drawForPlayer() {
+			if (!game || game.turn !== "player" || game.finished) return;
+			const card = drawOne();
+			if (!card) {
+				finishGame("computer");
+				return;
+			}
+			game.playerHand.push(card);
+			if (canPlay(card)) {
+				gameMessage("You drew a playable card. Play it or keep it and pass.");
+				renderGame();
+				return;
+			}
+			game.turn = "computer";
+			gameMessage("You drew a card. The computer is up.");
+			renderGame();
+			window.setTimeout(playComputerTurn, 650);
+		}
+
+		function finishGame(winner) {
+			game.finished = true;
+			game.turn = "finished";
+			elements.round.textContent = "Round complete";
+			if (winner === "player") {
+				leaderboard[game.playerKey].wins++;
+				saveLeaderboard();
+				gameMessage(`You win, ${game.name}! Play another round?`);
+			} else {
+				gameMessage("Computer wins this round. Deal another hand?");
+			}
+			renderGame();
+		}
+
+		elements.start.addEventListener("click", startGame);
+		elements.name.addEventListener("keydown", event => {
+			if (event.key === "Enter") startGame();
+		});
+		elements.draw.addEventListener("click", drawForPlayer);
+		elements.newGame.addEventListener("click", () => {
+			elements.setup.classList.remove("game-hidden");
+			elements.active.classList.add("game-hidden");
+			elements.round.textContent = "Ready";
+		});
+		renderLeaderboard();
+	</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#0b3978">
+	<title>Share Your Thoughts | JOHNNEX WEB</title>
+	<link rel="stylesheet" href="site.css">
+</head>
+<body>
+	<div class="page-shell">
+		<header class="page-header">
+			<a class="brand-link" href="index.html">JOHNNEX WEB</a>
+			<a class="home-link" href="index.html">Back to homepage</a>
+		</header>
+		<main class="content">
+			<h1>Share Your Thoughts</h1>
+			<p>I would love to hear from you. Send me a message using the form below.</p>
+			<form class="thoughts-form" action="https://formsubmit.co/olaosebikanjohn783@gmail.com" method="POST">
+				<input type="hidden" name="_subject" value="A new message from JOHNNEX WEB">
+				<div class="form-field">
+					<label for="sender-email">Your email</label>
+					<input id="sender-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+				</div>
+				<div class="form-field">
+					<label for="thoughts">Share your thoughts</label>
+					<textarea id="thoughts" name="message" placeholder="Write your message here..." required></textarea>
+				</div>
+				<button type="submit">Send</button>
+			</form>
+			<p class="form-note">Your message will be sent to <a href="mailto:olaosebikanjohn783@gmail.com">olaosebikanjohn783@gmail.com</a> </p>
+		</main>
+		<footer>© JOHNNEX WEB</footer>
+	</div>
+</body>
+</html>
